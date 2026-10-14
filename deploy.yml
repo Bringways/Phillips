@@ -1,0 +1,59 @@
+
+---
+- name: Deploy Bringways website on Node1
+  hosts: dev
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Install Apache web server
+      ansible.builtin.dnf:
+        name: httpd
+        state: present
+      when: ansible_facts['os_family'] == "RedHat"
+
+    - name: Start and enable Apache
+      ansible.builtin.service:
+        name: httpd
+        state: started
+        enabled: true
+
+    - name: Deploy website homepage
+      ansible.builtin.copy:
+        dest: /var/www/html/index.html
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Bringways | DevOps Deployment</title>
+          </head>
+          <body>
+            <h1>Welcome to Bringways!</h1>
+            <p>Successfully deployed using Jenkins and Ansible.</p>
+            <p>Node: {{ inventory_hostname }}</p>
+          </body>
+          </html>
+
+    - name: Verify Apache service is running
+      ansible.builtin.command: systemctl is-active httpd
+      register: apache_status
+      changed_when: false
+      failed_when: apache_status.stdout != "active"
+
+    - name: Verify website responds locally
+      ansible.builtin.uri:
+        url: http://127.0.0.1/
+        status_code: 200
+      register: website_check
+      retries: 5
+      delay: 2
+      until: website_check.status == 200
+
+    - name: Display deployment success
+      ansible.builtin.debug:
+        msg: "Bringways website deployed successfully on {{ inventory_hostname }}"
